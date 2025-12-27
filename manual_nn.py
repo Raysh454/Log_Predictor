@@ -15,7 +15,7 @@ from table import lookup, lookup_table
 # we have 8 (hidden layer weight) + 8 (hidden layer bias) + 8 (output layer weight) + 1 (output layer bias) == 25 parameters.
 # And one input x.
 
-EPOCHS = 150
+EPOCHS = 370
 
 HIDDEN_NODE_COUNT = 8
 parameters = json.load(open("parameters.json"))
@@ -104,7 +104,8 @@ def __main__():
 
 
 def training():
-    for _ in range(EPOCHS):
+    global LEARNING_RATE
+    for epoch in range(EPOCHS):
         node_outputs = []
         err_sum = 0
         for x in lookup_table:
@@ -115,8 +116,10 @@ def training():
             backprop(x, predicted, lookup(x), node_outputs)
 
             err_sum += (lookup(x) - predicted) ** 2
+        if epoch % 50 == 0:
+            LEARNING_RATE *= 0.9  # Decay learning rate
         mse = 1/len(lookup_table) * err_sum
-        print(f"MSE: {mse}")
+        print(f"MSE: {mse}, Epoch: {epoch}")
 
 
 __main__()
