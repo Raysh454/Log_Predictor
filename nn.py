@@ -36,7 +36,7 @@ def train():
 
         mse = mse_sum / len(X)
 
-        print(f"MSE: {mse}, Epoch: {epoch}")
+        print(f"MSE: {mse:.20f}, Epoch: {epoch}")
 
 def predict_log(x):
     inc = 0

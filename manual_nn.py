@@ -7,7 +7,7 @@ import math
 import json
 import copy
 import os, random
-from table import lookup, lookup_table
+import table
 
 
 # Since this is a 8 node hidden layer neural network,
@@ -17,13 +17,13 @@ from table import lookup, lookup_table
 
 EPOCHS = 10000
 
-PARAMETER_FILE = "parameters_8.json"
-HIDDEN_NODE_COUNT = 8
+PARAMETER_FILE = "parameters_4.json"
+HIDDEN_NODE_COUNT = 4
 parameters = json.load(open(PARAMETER_FILE))
 hidden_parameters = parameters["hidden_layer"]  # List of (weight, bias) dicts
 output_parameters = parameters["output_layer"]  # List of weights + bias
 
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.1
 
 # Stopping criteria
 MIN_DELTA = 1e-10
@@ -126,14 +126,13 @@ def test(data):
     for x in data:
         node_outputs = [tanhActivation(x * n["weight"] + n["bias"]) for n in hidden_parameters]
         predicted = sum(wi * ni for wi, ni in zip(output_parameters['weights'], node_outputs)) + output_parameters['bias']
-        err_sum += (lookup(x) - predicted) ** 2
+        err_sum += (table.lookup(x) - predicted) ** 2
     mse = 1/len(data) * err_sum
     return mse
 
 def training():
     global LEARNING_RATE
-    lookup_table_shuffled = shuffle_data(lookup_table)
-    training_data, testing_data = split_data(lookup_table_shuffled, 0.8)
+    training_data, testing_data = table.training_data, table.testing_data
     prev_mse = float('inf')
     decay_patience = 0
     stop_patience = 0
@@ -146,10 +145,10 @@ def training():
 
             predicted = sum(wi * ni for wi, ni in zip(output_parameters['weights'], node_outputs)) + output_parameters['bias']
 
-            backprop(x, predicted, lookup(x), node_outputs)
+            backprop(x, predicted, table.lookup(x), node_outputs)
 
-            err_sum += (lookup(x) - predicted) ** 2
-        mse = 1/len(lookup_table) * err_sum
+            err_sum += (table.lookup(x) - predicted) ** 2
+        mse = 1/len(table.lookup_table) * err_sum
 
         # Decay learning rate
         if mse > prev_mse:
