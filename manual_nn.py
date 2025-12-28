@@ -6,7 +6,7 @@ import sys
 import math
 import json
 import copy
-import os
+import os, random
 from table import lookup, lookup_table
 
 
@@ -15,14 +15,21 @@ from table import lookup, lookup_table
 # we have 8 (hidden layer weight) + 8 (hidden layer bias) + 8 (output layer weight) + 1 (output layer bias) == 25 parameters.
 # And one input x.
 
-EPOCHS = 370
+EPOCHS = 10000
 
+PARAMETER_FILE = "parameters_8.json"
 HIDDEN_NODE_COUNT = 8
-parameters = json.load(open("parameters.json"))
+parameters = json.load(open(PARAMETER_FILE))
 hidden_parameters = parameters["hidden_layer"]  # List of (weight, bias) dicts
 output_parameters = parameters["output_layer"]  # List of weights + bias
 
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.01
+
+# Stopping criteria
+MIN_DELTA = 1e-10
+STOP_PATIENCE = 10
+DECAY_PATIENCE = 5
+DECAY_FACTOR = 0.9
 
 def safe_write_json(filename, data):
     tmp_filename = filename + ".tmp"
@@ -58,12 +65,12 @@ def backprop(x, predicted, actual, node_outputs):
         new_parameters['hidden_layer'][i]['weight'] = hidden_parameters[i]['weight'] - LEARNING_RATE * change_in_hidden_w[i]
         new_parameters['hidden_layer'][i]['bias'] = hidden_parameters[i]['bias'] - LEARNING_RATE * change_in_hidden_b[i]
 
-    safe_write_json("parameters.json", new_parameters)
+    safe_write_json(PARAMETER_FILE, new_parameters)
     
     parameters = new_parameters
     hidden_parameters = parameters["hidden_layer"]
     output_parameters = parameters["output_layer"]
-
+ 
     #with open('parameter_hist.txt', 'a') as hist:
     #    hist.write(json.dumps(new_parameters) + '\n')
     
@@ -79,11 +86,11 @@ def run(inp):
     x, inc = reduce_input(inp)
 
     if x == 1:
-        return 0, 0
+        return 0 + inc, 0
     else:
         node_outputs = [tanhActivation(x * n["weight"] + n["bias"]) for n in hidden_parameters]
         predicted = sum(wi * ni for wi, ni in zip(output_parameters['weights'], node_outputs)) + output_parameters['bias']
-        return predicted + inc, abs(predicted - math.log10(x))
+        return predicted + inc, abs(predicted + inc - math.log10(inp))
 
 
 def __main__():
@@ -102,13 +109,39 @@ def __main__():
     else:
         training()
 
+def split_data(data, training_data_percent=0.8):
+    items = list(data.items())
+    split_index = int(len(items) * training_data_percent)
+    training_data = dict(items[:split_index])
+    validation_data = dict(items[split_index:])
+    return training_data, validation_data
+
+def shuffle_data(data):
+    items = list(data.items())
+    random.shuffle(items)
+    return dict(items)
+
+def test(data):
+    err_sum = 0
+    for x in data:
+        node_outputs = [tanhActivation(x * n["weight"] + n["bias"]) for n in hidden_parameters]
+        predicted = sum(wi * ni for wi, ni in zip(output_parameters['weights'], node_outputs)) + output_parameters['bias']
+        err_sum += (lookup(x) - predicted) ** 2
+    mse = 1/len(data) * err_sum
+    return mse
 
 def training():
     global LEARNING_RATE
+    lookup_table_shuffled = shuffle_data(lookup_table)
+    training_data, testing_data = split_data(lookup_table_shuffled, 0.8)
+    prev_mse = float('inf')
+    decay_patience = 0
+    stop_patience = 0
     for epoch in range(EPOCHS):
+        training_data = shuffle_data(training_data)
         node_outputs = []
         err_sum = 0
-        for x in lookup_table:
+        for x in training_data:
             node_outputs = [tanhActivation(x * n["weight"] + n["bias"]) for n in hidden_parameters]
 
             predicted = sum(wi * ni for wi, ni in zip(output_parameters['weights'], node_outputs)) + output_parameters['bias']
@@ -116,10 +149,36 @@ def training():
             backprop(x, predicted, lookup(x), node_outputs)
 
             err_sum += (lookup(x) - predicted) ** 2
-        if epoch % 50 == 0:
-            LEARNING_RATE *= 0.9  # Decay learning rate
         mse = 1/len(lookup_table) * err_sum
-        print(f"MSE: {mse}, Epoch: {epoch}")
+
+        # Decay learning rate
+        if mse > prev_mse:
+            decay_patience += 1
+
+        if decay_patience >= DECAY_PATIENCE:
+            LEARNING_RATE *= DECAY_FACTOR
+            print(f"Decayed learning rate to {LEARNING_RATE:.20f}")
+            decay_patience = 0
+
+        # Early stopping
+        improvement = abs(prev_mse - mse)
+        if improvement < MIN_DELTA:
+            stop_patience += 1
+        else:
+            stop_patience = 0
+
+        if stop_patience >= STOP_PATIENCE:
+            print("Early stopping triggered")
+            break
+
+        prev_mse = mse
+
+        print(f"MSE: {mse:.20f}, Epoch: {epoch}")
+
+    # Test
+    mse = test(testing_data)
+    print(f"Final MSE on testing data: {mse:.20f}")
 
 
-__main__()
+if __name__ == "__main__":
+    __main__()

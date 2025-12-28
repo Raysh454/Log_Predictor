@@ -1,0 +1,13 @@
+{
+    "hidden_layer": [
+        {"weight": 0.903, "bias": -1.000},
+        {"weight": 1.079, "bias": -1.176},
+        {"weight": 1.204, "bias": -1.301},
+        {"weight": 1.380, "bias": -1.477}
+    ],
+    "output_layer": {
+        "weights": [1.098, 0.954, 0.845, 0.699],
+        "bias": -0.512
+    }
+}
+
